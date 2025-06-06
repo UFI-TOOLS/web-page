@@ -1,0 +1,51 @@
+<canvas id="kanoChart"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  (() => {
+    const canvas = document.getElementById('kanoChart');
+    const ctx = canvas.getContext('2d');
+    const labels = ['1秒']
+    const data = [0]
+
+
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: '下载速度 (MB/s)',
+          data,
+          borderColor: '#40A7EC',
+          tension: 0.2,
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: {
+          duration: 500,    // 0.5秒动画
+          easing: 'easeOutQuad'  // 自然缓动效果
+        },
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            grid: { display: false }
+          },
+          y: {
+            grid: { display: false }
+          }
+        }
+      }
+    });
+
+    setInterval(() => {
+      labels.length > 10 && labels.shift()
+      labels.push(Number(labels[labels.length - 1].replace('秒', '')) + 1 + '秒')
+      data.length > 10 && data.shift()
+      data.push(Math.floor(Math.random() * 1025))
+      chart.update()
+    }, 1000);
+
+  })()
+</script>

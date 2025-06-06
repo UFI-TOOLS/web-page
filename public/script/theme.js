@@ -51,7 +51,7 @@ function updateTextColor(e) {
     const gray = Math.round((value / 100) * 255);
     const color = `rgb(${gray}, ${gray}, ${gray})`;
     currentTextColor = color;
-    updateColor()
+    updateColor();
     //保存进度到localStorage
     localStorage.setItem('textColorPer', value);
     localStorage.setItem('textColor', color);
@@ -107,17 +107,17 @@ const initTheme = () => {
         textColorPer = 100;
         localStorage.setItem('textColorPer', textColorPer);
     }
-    
+
     currentHue = color;
     currentOpacity = opacityPer / 100;
     currentValue = value / 100;
     currentSaturation = saturation / 100;
     currentTextColor = textColor;
-    updateColor()
+    updateColor();
     document.querySelector("#colorEl").value = colorPer;
     document.querySelector("#opacityEl").value = opacityPer;
     document.querySelector("#brightEl").value = value;
     document.querySelector("#saturationEl").value = saturation;
     document.querySelector("#textColorEl").value = textColorPer;
 }
-initTheme()
+initTheme();

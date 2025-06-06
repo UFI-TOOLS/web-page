@@ -2,7 +2,37 @@ let isNeedToken = true
 const MODEL = document.querySelector("#MODEL")
 let QORS_MESSAGE = null
 let smsSender = null
-let psw_fail_num = 0
+let psw_fail_num = 0;
+
+//customHead
+(() => {
+    getCustomHead().then((head_text) => {
+        if (head_text) {
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(head_text, 'text/html');
+
+                doc.querySelectorAll('style, link, meta').forEach(el => {
+                    document.head.appendChild(el.cloneNode(true));
+                });
+
+                doc.querySelectorAll('script').forEach(scriptEl => {
+                    const newScript = document.createElement('script');
+                    if (scriptEl.src) {
+                        newScript.src = scriptEl.src;
+                    } else {
+                        newScript.textContent = scriptEl.textContent;
+                    }
+                    if (scriptEl.type) newScript.type = scriptEl.type;
+
+                    document.head.appendChild(newScript);
+                })
+            } catch (e) {
+                alert('自定义head解析失败，请检查内容是否正确。');
+            }
+        }
+    })
+})();
 
 //ttyd
 if (!localStorage.getItem('ttyd_port')) {
@@ -21,10 +51,9 @@ if ('serviceWorker' in navigator) {
 
 //判断一下是否需要token
 const needToken = async () => {
-    //获取设备型号与电量，整合（如果有）
     try {
-        let res = await (await fetch(`${KANO_baseURL}/battery_and_model`, { headers: { ...common_headers } })).json()
-        if (!res.model) {
+        let res = await (await fetch(`${KANO_baseURL}/version_info`, { headers: { ...common_headers } })).json()
+        if (!res.app_ver) {
             isNeedToken = true
         } else {
             isNeedToken = false
@@ -58,11 +87,11 @@ function main_func() {
     const showList = _stor != null ? JSON.parse(_stor) : {
         statusShowList: [
             {
-                "name": "network_type",
+                "name": "QORS_MESSAGE",
                 "isShow": true
             },
             {
-                "name": "QORS_MESSAGE",
+                "name": "network_type",
                 "isShow": true
             },
             {
@@ -99,14 +128,6 @@ function main_func() {
             },
             {
                 "name": "daily_data",
-                "isShow": true
-            },
-            {
-                "name": "internal_available_storage",
-                "isShow": true
-            },
-            {
-                "name": "external_available_storage",
                 "isShow": true
             },
             {
@@ -226,7 +247,15 @@ function main_func() {
             {
                 "name": "msisdn",
                 "isShow": true
-            }
+            },
+            {
+                "name": "internal_available_storage",
+                "isShow": true
+            },
+            {
+                "name": "external_available_storage",
+                "isShow": true
+            },
         ]
 
     }
@@ -333,6 +362,7 @@ function main_func() {
         initNetworktype()
         initSMBStatus()
         initROAMStatus()
+        initSimCardType()
         initLightStatus()
         initBandForm()
         initUSBNetworkType()
@@ -345,7 +375,6 @@ function main_func() {
         initATBtn()
         initAdvanceTools()
         initShellBtn()
-        initSimCardType()
         QOSRDPCommand("AT+CGEQOSRDP=1")
     }
 
@@ -362,7 +391,7 @@ function main_func() {
             if (isNeedToken) {
                 if (!token || !token?.trim()) return createToast('请输入token！', 'red')
             }
-            KANO_TOKEN = token.trim()
+            KANO_TOKEN = SHA256(token.trim()).toLowerCase()
             common_headers.authorization = KANO_TOKEN
             let { psw_fail_num_str, login_lock_time } = await getData(new URLSearchParams({
                 cmd: 'psw_fail_num_str,login_lock_time'
@@ -382,7 +411,7 @@ function main_func() {
             }
             createToast('登录成功！', 'green')
             localStorage.setItem('kano_sms_pwd', password.trim())
-            localStorage.setItem('kano_sms_token', token.trim())
+            localStorage.setItem('kano_sms_token', SHA256(token.trim()).toLowerCase())
             closeModal('#tokenModal')
             initRenderMethod()
         }
@@ -535,6 +564,16 @@ function main_func() {
                 date_b.pop()
                 return Number(date_b.join('')) - Number(date_a.join(''))
             })
+            // 收集所有id，已读操作
+            const allIds = res?.filter(item => item.tag == '1')?.map(item => item.id)
+            if (allIds && allIds.length > 0) {
+                try {
+                    console.log(allIds, '批量已读短信');
+                    readSmsByIds(allIds)
+                } catch (error) {
+                    console.log('批量已读短信失败', error);
+                }
+            }
             list.innerHTML = res.map(item => {
                 let date = item.date.split(',')
                 date.pop()
@@ -549,7 +588,7 @@ function main_func() {
                                         </div>
                                         <p style="color:#adadad;font-size:16px;margin:4px 0">${item.number}</p>
                                         <p>${decodeBase64(item.content)}</p>
-                                        <p style="text-align:right;color:#adadad;margin-top:4px">${date}</p >
+                                        <p style="text-align:right;color:#adadad;margin-top:4px">${date}</p>
                                     </li > `
             }).join('')
         } else {
@@ -595,6 +634,7 @@ function main_func() {
             return
         }
         if (res) {
+            window.UFI_DATA = res
             adbQuery()
             isNotLoginOnce = false
             const current_cell = document.querySelector('#CURRENT_CELL')
@@ -616,19 +656,31 @@ function main_func() {
             `
             }
 
-            if (QORS_MESSAGE) {
-                res['QORS_MESSAGE'] = QORS_MESSAGE
-            }
+            try {
+
+                if (QORS_MESSAGE) {
+                    res['QORS_MESSAGE'] = QORS_MESSAGE
+                }
+                const unreadEl = document.querySelector('#UNREAD_SMS')
+                if (res.sms_unread_num && res.sms_unread_num > 0) {
+                    unreadEl.style.display = ''
+                    unreadEl.innerHTML = res.sms_unread_num > 99 ? '99+' : res.sms_unread_num
+                } else {
+                    unreadEl.innerHTML = ''
+                    unreadEl.style.display = 'none'
+                }
+
+            } catch { }
 
             let statusHtml_base = {
-                network_type: `${notNullOrundefinedOrIsShow(res, 'network_type') ? `<strong onclick="copyText(event)"  class="green">蜂窝状态：${res.network_provider} ${res.network_type == '20' ? '5G' : res.network_type == '13' ? '4G' : res.network_type}</strong>` : ''}`,
                 QORS_MESSAGE: `${notNullOrundefinedOrIsShow(res, "QORS_MESSAGE") ? `<strong onclick="copyText(event)"  class="green">${QORS_MESSAGE}</strong>` : ''}`,
-                wifi_access_sta_num: `${notNullOrundefinedOrIsShow(res, 'wifi_access_sta_num') ? `<strong onclick="copyText(event)"  class="blue">WIFI设备数：${res.wifi_access_sta_num}</strong>` : ''}`,
-                battery: `${notNullOrundefinedOrIsShow(res, 'battery') ? `<strong onclick="copyText(event)"  class="green">剩余电量：${res.battery} %</strong>` : ''}`,
-                rssi: `${notNullOrundefinedOrIsShow(res, 'rssi') || notNullOrundefinedOrIsShow(res, 'network_signalbar', true) ? `<strong onclick="copyText(event)"  class="green">蜂窝信号强度：${kano_getSignalEmoji(notNullOrundefinedOrIsShow(res, 'rssi') ? res.rssi : res.network_signalbar)}</strong>` : ''}`,
-                cpu_temp: `${notNullOrundefinedOrIsShow(res, 'cpu_temp') ? `<strong onclick="copyText(event)"  class="blue">CPU温度：${Number(res.cpu_temp / 1000).toFixed(2)} ℃</strong>` : ''}`,
-                cpu_usage: `${notNullOrundefinedOrIsShow(res, 'cpu_usage') ? `<strong onclick="copyText(event)"  class="blue">CPU使用率：${Number(res.cpu_usage).toFixed(2)} %</strong>` : ''}`,
-                mem_usage: `${notNullOrundefinedOrIsShow(res, 'mem_usage') ? `<strong onclick="copyText(event)"  class="blue">内存使用率：${Number(res.mem_usage).toFixed(2)} %</strong>` : ''}`,
+                network_type: `${notNullOrundefinedOrIsShow(res, 'network_type') ? `<strong onclick="copyText(event)"  class="green">网络状态：${res.network_provider} ${res.network_type == '20' ? '5G' : res.network_type == '13' ? '4G' : res.network_type}</strong>` : ''}`,
+                wifi_access_sta_num: `${notNullOrundefinedOrIsShow(res, 'wifi_access_sta_num') ? `<strong onclick="copyText(event)"  class="blue">WIFI连接：${res.wifi_access_sta_num}</strong>` : ''}`,
+                battery: `${notNullOrundefinedOrIsShow(res, 'battery') ? `<strong onclick="copyText(event)"  class="green">${res.battery_charging == "1" ? "正在充电" : "剩余电量"}：${res.battery} %</strong>` : ''}`,
+                rssi: `${notNullOrundefinedOrIsShow(res, 'rssi') || notNullOrundefinedOrIsShow(res, 'network_signalbar', true) ? `<strong onclick="copyText(event)"  class="green">信号强度：${kano_getSignalEmoji(notNullOrundefinedOrIsShow(res, 'rssi') ? res.rssi : res.network_signalbar)}</strong>` : ''}`,
+                cpu_temp: `${notNullOrundefinedOrIsShow(res, 'cpu_temp') ? `<strong onclick="copyText(event)"  class="blue">CPU温度：<span style="text-align:center;display:inline-block;width: 8ch;">${String(Number(res.cpu_temp / 1000).toFixed(2)).padStart(5, ' ')} ℃</span></strong>` : ''}`,
+                cpu_usage: `${notNullOrundefinedOrIsShow(res, 'cpu_usage') ? `<strong onclick="copyText(event)"  class="blue">CPU占用：<span style="text-align:center;display:inline-block;width: 8ch;">${String(Number(res.cpu_usage).toFixed(2)).padStart(5, ' ')} %</span></strong>` : ''}`,
+                mem_usage: `${notNullOrundefinedOrIsShow(res, 'mem_usage') ? `<strong onclick="copyText(event)"  class="blue">内存占用：<span style="text-align:center;display:inline-block;width: 8ch;">${String(Number(res.mem_usage).toFixed(2)).padStart(5, ' ')} %</span></strong>` : ''}`,
                 realtime_time: `${notNullOrundefinedOrIsShow(res, 'realtime_time') ? `<strong onclick="copyText(event)"  class="blue">连接时长：${kano_formatTime(Number(res.realtime_time))}${res.monthly_time ? '&nbsp;<span style="color:white">/</span>&nbsp;总时长: ' + kano_formatTime(Number(res.monthly_time)) : ''}</strong>` : ''}`,
                 monthly_tx_bytes: `${notNullOrundefinedOrIsShow(res, 'monthly_tx_bytes') || notNullOrundefinedOrIsShow(res, 'monthly_rx_bytes') ? `<strong onclick="copyText(event)"  class="blue">已用流量：<span class="red">${formatBytes(Number((res.monthly_tx_bytes + res.monthly_rx_bytes)))}</span>${(res.data_volume_limit_size || res.flux_data_volume_limit_size) && (res.flux_data_volume_limit_switch == '1' || res.data_volume_limit_switch == '1') ? '&nbsp;<span style="color:white">/</span>&nbsp;总流量：' + formatBytes((() => {
                     const limit_size = res.data_volume_limit_size ? res.data_volume_limit_size : res.flux_data_volume_limit_size
@@ -636,9 +688,7 @@ function main_func() {
                     return limit_size.split('_')[0] * limit_size.split('_')[1] * Math.pow(1024, 2)
                 })()) : ''}</strong>` : ''}`,
                 daily_data: `${notNullOrundefinedOrIsShow(res, 'daily_data') ? `<strong onclick="copyText(event)"  class="blue">当日流量：${formatBytes(res.daily_data)}</strong>` : ''}`,
-                internal_available_storage: `${notNullOrundefinedOrIsShow(res, 'internal_available_storage') || notNullOrundefinedOrIsShow(res, 'internal_total_storage') ? `<strong onclick="copyText(event)" class="blue">内部存储：${formatBytes(res.internal_used_storage)} 已用 / ${formatBytes(res.internal_total_storage)} 总容量</strong>` : ''}`,
-                external_available_storage: `${notNullOrundefinedOrIsShow(res, 'external_available_storage') || notNullOrundefinedOrIsShow(res, 'external_total_storage') ? `<strong onclick="copyText(event)" class="blue">SD卡：${formatBytes(res.external_used_storage)} 已用 / ${formatBytes(res.external_total_storage)} 总容量</strong>` : ''}`,
-                realtime_rx_thrpt: `${notNullOrundefinedOrIsShow(res, 'realtime_tx_thrpt') || notNullOrundefinedOrIsShow(res, 'realtime_rx_thrpt') ? `<strong onclick="copyText(event)" class="blue">当前网速: ⬇️ ${formatBytes(Number((res.realtime_rx_thrpt)))}/S ⬆️ ${formatBytes(Number((res.realtime_tx_thrpt)))}/S</strong>` : ''}`,
+                realtime_rx_thrpt: `${notNullOrundefinedOrIsShow(res, 'realtime_tx_thrpt') || notNullOrundefinedOrIsShow(res, 'realtime_rx_thrpt') ? `<strong onclick="copyText(event)" class="blue">当前网速: <span style="text-align:center;display:inline-block;width: 14ch;">⬇️&nbsp;${formatBytes(Number((res.realtime_rx_thrpt)), true)}/S</span><span style="text-align:center;display:inline-block;width: 14ch;">⬆️&nbsp;${formatBytes(Number((res.realtime_tx_thrpt)))}/S</span></strong>` : ''}`,
             }
             let statusHtml_net = {
                 lte_rsrp: `${notNullOrundefinedOrIsShow(res, 'lte_rsrp') ? `<strong onclick="copyText(event)"  class="green">4G接收功率：${kano_parseSignalBar(res.lte_rsrp)}</strong>` : ''}`,
@@ -672,6 +722,8 @@ function main_func() {
                 lan_ipaddr: `${notNullOrundefinedOrIsShow(res, 'lan_ipaddr') ? `<strong onclick="copyText(event)"  class="blue">本地网关：${res.lan_ipaddr}</strong>` : ''}`,
                 mac_address: `${notNullOrundefinedOrIsShow(res, 'mac_address') ? `<strong onclick="copyText(event)"  class="blue">MAC地址：${res.mac_address}</strong>` : ''}`,
                 msisdn: `${notNullOrundefinedOrIsShow(res, 'msisdn') ? `<strong onclick="copyText(event)"  class="blue">手机号：${res.msisdn}</strong>` : ''}`,
+                internal_available_storage: `${notNullOrundefinedOrIsShow(res, 'internal_available_storage') || notNullOrundefinedOrIsShow(res, 'internal_total_storage') ? `<strong onclick="copyText(event)" class="blue">内部存储：${formatBytes(res.internal_used_storage)} 已用 / ${formatBytes(res.internal_total_storage)} 总容量</strong>` : ''}`,
+                external_available_storage: `${notNullOrundefinedOrIsShow(res, 'external_available_storage') || notNullOrundefinedOrIsShow(res, 'external_total_storage') ? `<strong onclick="copyText(event)" class="blue">SD卡：${formatBytes(res.external_used_storage)} 已用 / ${formatBytes(res.external_total_storage)} 总容量</strong>` : ''}`,
             }
 
             html += `<li style="padding-top: 15px;"><p>`
@@ -742,7 +794,6 @@ function main_func() {
                 console.error(e.message)
             }
         }
-        btn.innerHTML = res.usb_port_switch == '1' ? '关闭USB调试' : '开启USB调试'
         btn.style.backgroundColor = res.usb_port_switch == '1' ? '#018ad8b0' : ''
 
     }
@@ -776,6 +827,13 @@ function main_func() {
                     out()
                     return null
                 }
+                // usb调试需要同步开启
+                if (!(res.enabled == "true" || res.enabled == true)) {
+                    await (await postData(cookie, {
+                        goformId: 'USB_PORT_SETTING',
+                        usb_port_switch: '1'
+                    })).json()
+                }
                 let res1 = await (await fetch(`${KANO_baseURL}/adb_wifi_setting`, {
                     method: 'POST',
                     headers: {
@@ -789,6 +847,7 @@ function main_func() {
                 })).json()
                 if (res1.result == 'success') {
                     createToast('操作成功！重启生效', 'green')
+                    await handlerADBStatus()
                     await handlerADBNetworkStatus()
                 } else {
                     createToast('操作失败！', 'red')
@@ -797,7 +856,6 @@ function main_func() {
                 console.error(e.message)
             }
         }
-        btn.innerHTML = res.enabled == "true" || res.enabled == true ? '关闭网络ADB自启' : '开启网络ADB自启'
         btn.style.backgroundColor = res.enabled == "true" || res.enabled == true ? '#018ad8b0' : ''
 
     }
@@ -814,7 +872,6 @@ function main_func() {
         let res = await getData(new URLSearchParams({
             cmd: 'performance_mode'
         }))
-        btn.innerHTML = res.performance_mode == '1' ? '关闭性能模式' : '开启性能模式'
         btn.style.backgroundColor = res.performance_mode == '1' ? '#018ad8b0' : ''
         btn.onclick = async () => {
             try {
@@ -1024,6 +1081,7 @@ function main_func() {
 
     //WiFi开关切换
     let changeWIFISwitch = async (e) => {
+        const selectEl = document.querySelector('#WIFI_SWITCH')
         const value = e.target.value.trim()
         if (!(await initRequestData()) || !value) {
             createToast('需要登录', 'red')
@@ -1031,6 +1089,8 @@ function main_func() {
         }
         createToast('更改中，请稍后', '#BF723F')
         try {
+            selectEl.style.backgroundColor = '#80808073'
+            selectEl.disabled = true
             const cookie = await login()
             if (!cookie) {
                 createToast('登录失败，请检查密码', 'red')
@@ -1052,13 +1112,17 @@ function main_func() {
             } else {
                 return
             }
-            if (res.result == 'success') {
-                createToast('操作成功，请重新连接WiFi！', 'green')
-                closeModal("#WIFIManagementModal")
-            } else {
-                createToast('操作失败！', 'red')
-            }
-            await initWIFISwitch()
+            setTimeout(() => {
+                if (res.result == 'success') {
+                    createToast('操作成功，请重新连接WiFi！', 'green')
+                    initWIFISwitch()
+
+                } else {
+                    createToast('操作失败！', 'red')
+                }
+                selectEl.style.backgroundColor = ''
+                selectEl.disabled = false
+            }, 1000);
         } catch (e) {
             // createToast(e.message)
         }
@@ -1100,7 +1164,6 @@ function main_func() {
                 // createToast(e.message)
             }
         }
-        el.innerHTML = res.samba_switch == '1' ? '关闭SMB文件共享' : '开启SMB文件共享'
         el.style.backgroundColor = res.samba_switch == '1' ? '#018ad8b0' : ''
     }
     initSMBStatus()
@@ -1147,7 +1210,6 @@ function main_func() {
                 // createToast(e.message)
             }
         }
-        el.innerHTML = res.roam_setting_option == 'on' ? '关闭网络漫游' : '开启网络漫游'
         el.style.backgroundColor = res.roam_setting_option == 'on' ? '#018ad8b0' : ''
     }
     initROAMStatus()
@@ -1188,7 +1250,6 @@ function main_func() {
                 createToast(e.message, 'red')
             }
         }
-        el.innerHTML = res.indicator_light_switch == '1' ? '关闭指示灯' : '开启指示灯'
         el.style.backgroundColor = res.indicator_light_switch == '1' ? '#018ad8b0' : ''
     }
     initLightStatus()
@@ -1670,8 +1731,8 @@ function main_func() {
                         form_data['flux_clear_date'] = value.trim()
                         break;
                     case 'data_volume_alert_percent':
-                        if (isNaN(Number(value.trim()))) {
-                            createToast('提醒阈值必须为数字', 'red')
+                        if (isNaN(Number(value.trim())) || value.trim() == '') {
+                            createToast('提醒阈值输入错误', 'red')
                             return
                         }
                         if (Number(value.trim()) < 0 || Number(value.trim()) > 100) {
@@ -1786,7 +1847,16 @@ function main_func() {
                         ApBroadcastDisabledEl && (ApBroadcastDisabledEl.checked = item.ApBroadcastDisabled.toString() == '0')
                         SSIDEl && (SSIDEl.value = item.SSID)
                         // 二维码
-                        QRCodeImg.src = KANO_baseURL + item.QrImageUrl
+                        fetch(KANO_baseURL + item.QrImageUrl, {
+                            headers: common_headers
+                        }).then(async (res) => {
+                            const blob = await res.blob();
+                            const objectURL = URL.createObjectURL(blob);
+                            QRCodeImg.onload = () => {
+                                URL.revokeObjectURL(objectURL);
+                            };
+                            QRCodeImg.src = objectURL;
+                        });
                         const WIFI_FORM_SHOWABLE = document.querySelector('#WIFI_FORM_SHOWABLE')
                         AuthModeEl.value = item.AuthMode
                         AuthModeEl.selected = item.AuthMode
@@ -2111,7 +2181,7 @@ function main_func() {
                     out()
                     return null
                 }
-                btn.innerHTML = '正在更改...'
+                btn.innerHTML = '更改中..'
                 let res1 = await (await postData(cookie, {
                     goformId: res.ppp_status == 'ppp_disconnected' ? 'CONNECT_NETWORK' : 'DISCONNECT_NETWORK',
                 })).json()
@@ -2128,7 +2198,7 @@ function main_func() {
                 // createToast(e.message)
             }
         }
-        btn.innerHTML = res.ppp_status == 'ppp_disconnected' ? '开启蜂窝数据' : '关闭蜂窝数据'
+        btn.innerHTML = '数据流量'
         btn.style.backgroundColor = res.ppp_status == 'ppp_disconnected' ? '' : '#018ad8b0'
     }
     handlerCecullarStatus()
@@ -2136,10 +2206,10 @@ function main_func() {
     // title
     const loadTitle = async () => {
         try {
-            const { app_ver, model } = await (await fetch(`${KANO_baseURL}/battery_and_model`, { headers: common_headers })).json()
+            const { app_ver, model } = await (await fetch(`${KANO_baseURL}/version_info`, { headers: common_headers })).json()
             MODEL.innerHTML = `设备：${model}`
-            document.querySelector('#TITLE').innerHTML = `[${model}]ZTE-UFI-TOOLS-WEB Ver: ${app_ver}`
-            document.querySelector('#MAIN_TITLE').innerHTML = `ZTE-UFI管理工具 <span style="font-size:14px">Ver: ${app_ver}</span>`
+            document.querySelector('#TITLE').innerHTML = `[${model}]UFI-TOOLS-WEB Ver: ${app_ver}`
+            document.querySelector('#MAIN_TITLE').innerHTML = `UFI-TOOLS <span style="font-size:14px">Ver: ${app_ver}</span>`
         } catch {/*没有，不处理*/ }
     }
     loadTitle()
@@ -2147,13 +2217,28 @@ function main_func() {
     //设置背景图片
     document.querySelector('#BG_SETTING').onclick = () => {
         showModal('#bgSettingModal')
+        initBG()
     }
 
-    let handleSubmitBg = () => {
+    let handleSubmitBg = async () => {
+        const custom_head = document.querySelector('#custom_head')
         const imgUrl = document.querySelector('#BG_INPUT')?.value
         const bg_checked = document.querySelector('#isCheckedBG')?.checked
         const BG = document.querySelector('#BG')
         const BG_OVERLAY = document.querySelector('#BG_OVERLAY')
+        if ((await initRequestData())) {
+            setCustomHead(custom_head.value?.trim() || '').then(async ({ result, error }) => {
+                if (result != "success") {
+                    if (error)
+                        createToast(error, 'red')
+                    else
+                        createToast('自定义头部保存失败，请检查网络', 'red')
+                }
+            })
+        } else {
+            createToast('没有登录，自定义头部不会保存', 'yellow')
+        }
+
         if (!BG || bg_checked == undefined || !BG_OVERLAY) return
         if (!bg_checked) {
             BG.style.backgroundImage = 'unset'
@@ -2171,11 +2256,20 @@ function main_func() {
     }
 
     //初始化背景图片
-    (() => {
+    const initBG = async () => {
+        const head_text = await getCustomHead()
         const BG = document.querySelector('#BG')
         const imgUrl = localStorage.getItem('backgroundUrl')
         const isCheckedBG = document.querySelector('#isCheckedBG')
         const BG_INPUT = document.querySelector('#BG_INPUT')
+
+        if (head_text) {
+            const custom_head = document.querySelector('#custom_head')
+            if (custom_head) {
+                custom_head.value = head_text
+            }
+        }
+
         if (!BG || !isCheckedBG || !BG_INPUT) return
         isCheckedBG.checked = imgUrl ? true : false
         if (imgUrl?.length < 9999) {
@@ -2186,8 +2280,10 @@ function main_func() {
             // BG_OVERLAY && (BG_OVERLAY.style.background = 'transparent')
             return
         }
+
         BG.style.backgroundImage = `url(${imgUrl})`
-    })()
+    }
+    initBG()
 
     //重置主题
     let resetThemeBtnTimer = 1
@@ -2728,54 +2824,56 @@ function main_func() {
     //NFC切换
     let initNFCSwitch = async () => {
         const btn = document.querySelector('#NFC')
-        // 查询是否支持NFC
-        const { is_support_nfc_functions } = await getData(new URLSearchParams({
-            cmd: 'is_support_nfc_functions'
-        }))
-        if (!is_support_nfc_functions || Number(is_support_nfc_functions) == 0) {
-            return
-        } else {
-            btn.style.display = ''
-        }
         if (!(await initRequestData())) {
             btn.onclick = () => createToast('请登录', 'red')
             btn.style.backgroundColor = '#80808073'
             return null
         }
-        btn.style.backgroundColor = ''
-        const { web_wifi_nfc_switch } = await getData(new URLSearchParams({
-            cmd: 'web_wifi_nfc_switch'
-        }))
-
-        btn.onclick = async () => {
-            try {
-                if (!(await initRequestData())) {
-                    btn.style.backgroundColor = '#80808073'
-                    return null
-                }
-                const cookie = await login()
-                if (!cookie) {
-                    createToast('登录失败，请检查密码', 'red')
-                    out()
-                    return null
-                }
-                let res = await (await postData(cookie, {
-                    goformId: 'WIFI_NFC_SET',
-                    web_wifi_nfc_switch: web_wifi_nfc_switch.toString() == '1' ? '0' : '1'
-                })).json()
-                if (res.result == 'success') {
-                    createToast('操作成功！', 'green')
-                    initNFCSwitch()
-                } else {
-                    createToast('操作失败！', 'red')
-                }
-            } catch (e) {
-                // createToast(e.message)
+        // 查询是否支持NFC
+        try {
+            const { is_support_nfc_functions } = await getData(new URLSearchParams({
+                cmd: 'is_support_nfc_functions'
+            }))
+            if (!is_support_nfc_functions || Number(is_support_nfc_functions) == 0) {
+                return
+            } else {
+                btn.style.display = ''
             }
-        }
 
-        btn.style.backgroundColor = web_wifi_nfc_switch.toString() == '1' ? '#018ad8b0' : ''
-        btn.innerHTML = web_wifi_nfc_switch.toString() == '1' ? '关闭NFC' : '开启NFC'
+            btn.style.backgroundColor = ''
+            const { web_wifi_nfc_switch } = await getData(new URLSearchParams({
+                cmd: 'web_wifi_nfc_switch'
+            }))
+
+            btn.onclick = async () => {
+                try {
+                    if (!(await initRequestData())) {
+                        btn.style.backgroundColor = '#80808073'
+                        return null
+                    }
+                    const cookie = await login()
+                    if (!cookie) {
+                        createToast('登录失败，请检查密码', 'red')
+                        out()
+                        return null
+                    }
+                    let res = await (await postData(cookie, {
+                        goformId: 'WIFI_NFC_SET',
+                        web_wifi_nfc_switch: web_wifi_nfc_switch.toString() == '1' ? '0' : '1'
+                    })).json()
+                    if (res.result == 'success') {
+                        createToast('操作成功！', 'green')
+                        initNFCSwitch()
+                    } else {
+                        createToast('操作失败！', 'red')
+                    }
+                } catch (e) {
+                    // createToast(e.message)
+                }
+            }
+
+            btn.style.backgroundColor = web_wifi_nfc_switch.toString() == '1' ? '#018ad8b0' : ''
+        } catch { }
     }
     initNFCSwitch()
 
@@ -2944,7 +3042,12 @@ function main_func() {
 
     //打赏模态框设置
     const payModalState = localStorage.getItem('hidePayModal') || false
-    !payModalState && showModal('#payModal')
+    !payModalState && window.addEventListener('load', () => {
+        setTimeout(() => {
+            showModal('#payModal')
+        }, 300);
+    })
+
     const onClosePayModal = () => {
         closeModal('#payModal')
         localStorage.setItem('hidePayModal', 'true')
@@ -3144,7 +3247,7 @@ function main_func() {
         try {
             const content = await queryUpdate()
             if (content) {
-                const { app_ver, app_ver_code } = await (await fetch(`${KANO_baseURL}/battery_and_model`, { headers: common_headers })).json();
+                const { app_ver, app_ver_code } = await (await fetch(`${KANO_baseURL}/version_info`, { headers: common_headers })).json();
                 const { name, base_uri, changelog } = content;
 
                 const version = name.match(/V(\d+\.\d+\.\d+)/i)?.[1];
@@ -3196,8 +3299,11 @@ function main_func() {
                 if (!isLatest) {
                     changelogTextContent.innerHTML = changelog
                 }
-                OTATextContent.innerHTML = `${isLatest ? `<div>当前已是最新版本：V${app_ver} ${app_ver_code}</div>` : `<div>发现更新:${name}<br/>${date_str ? `<br/>发布日期：${date_str}` : ''}</div><br/>`}`
-                return !isLatest ? version + ' ' + date_str : null
+                OTATextContent.innerHTML = `${isLatest ? `<div>当前已是最新版本：V${app_ver} ${app_ver_code}</div>` : `<div>发现更新:${name}<br/>${date_str ? `发布日期：${date_str}` : ''}</div>`}`
+                return !isLatest ? {
+                    isForceUpdate: name.includes('force'),
+                    text: version + ' ' + date_str
+                } : null
 
             } else {
                 throw new Error('出错')
@@ -3237,16 +3343,20 @@ function main_func() {
 
     //adb轮询
     const adbQuery = async () => {
-        const adb_status = await adbKeepAlive()
-        const adb_text = adb_status ? '网络ADB状态：🟢 正常' : '网络ADB状态：🟡 等待初始化'
-        const adbStatusEl = document.querySelectorAll('.adb_status')
-        if (adbStatusEl && adbStatusEl.length > 0) {
-            adbStatusEl.forEach((item) => {
-                try {
-                    item.innerHTML = adb_text
-                } catch { }
-            })
-        }
+        try {
+            const adb_status = await adbKeepAlive()
+            const adb_text = adb_status ? '网络ADB状态：🟢 正常' : '网络ADB状态：🟡 等待初始化'
+            const version = window.UFI_DATA && window.UFI_DATA.cr_version ? window.UFI_DATA.cr_version : ''
+            const adbSwitch = window.UFI_DATA && window.UFI_DATA.usb_port_switch == '1' ? true : false
+            const adbStatusEl = document.querySelectorAll('.adb_status')
+            if (adbStatusEl && adbStatusEl.length > 0) {
+                adbStatusEl.forEach((item) => {
+                    try {
+                        item.innerHTML = adb_text + `<br/>USB调试开关：${adbSwitch ? '🟢 开启' : '🔴 未开启'}` + `<br/>固件版本：${version}`
+                    } catch { }
+                })
+            }
+        } catch { }
     }
     adbQuery()
 
@@ -3288,7 +3398,7 @@ function main_func() {
     setTimeout(() => {
         checkUpdateAction(true).then((res) => {
             if (res) {
-                createToast(`发现新版本：V${res}`)
+                createToast(`发现${res.isForceUpdate ? "常驻更新" : "新版本"}：${res.text}`)
             }
         })
     }, 100);
@@ -3724,8 +3834,87 @@ function main_func() {
         enableDHCP.value = status == 'open' ? "SERVER" : "DISABLE"
     })
 
+    //插件上传
+    const handlePluginFileUpload = (event) => {
+        return new Promise((resolve, reject) => {
+            const file = event.target.files[0];
+
+            if (file) {
+                if (file.size > 1145 * 1024) {
+                    createToast(`文件大小不能超过${1145}KB！`, 'red')
+                    reject({ msg: `文件大小不能超过${1145}KB！`, data: null })
+                } else {
+                    const reader = new FileReader();
+                    reader.readAsText(file); // 将文件读取为Data URL
+                    reader.onload = (e) => {
+                        const str = e.target.result;
+                        console.log(str);
+                        const custom_head = document.querySelector("#custom_head")
+                        custom_head && (custom_head.value += (`\n\n\n<!-- ${file.name} -->\n` + str))
+                        createToast("添加成功，提交后生效!", 'pink')
+                        resolve({ msg: 'ok' })
+                    }
+                }
+            }
+        })
+    }
+
+    const onPluginBtn = () => {
+        document.querySelector('#pluginFileInput')?.click()
+    }
+
+    // (() => {
+    //     const canvas = document.getElementById('kanoChart');
+    //     const ctx = canvas.getContext('2d');
+    //     const labels = ['1秒']
+    //     const data = [0]
+
+
+    //     const chart = new Chart(ctx, {
+    //         type: 'line',
+    //         data: {
+    //             labels,
+    //             datasets: [{
+    //                 label: '下载速度 (MB/s)',
+    //                 data,
+    //                 borderColor: '#40A7EC',
+    //                 tension: 0.2,
+    //             }]
+    //         },
+    //         options: {
+    //             responsive: true,
+    //             animation: {
+    //                 duration: 500,    // 0.5秒动画
+    //                 easing: 'easeOutQuad'  // 自然缓动效果
+    //             },
+    //             plugins: {
+    //                 legend: { display: false }
+    //             },
+    //             scales: {
+    //                 x: {
+    //                     grid: { display: false }
+    //                 },
+    //                 y: {
+    //                     grid: { display: false }
+    //                 }
+    //             }
+    //         }
+    //     });
+
+    //     setInterval(() => {
+    //         labels.length > 10 && labels.shift()
+    //         labels.push(Number(labels[labels.length - 1].replace('秒', '')) + 1 + '秒')
+    //         data.length > 10 && data.shift()
+    //         data.push(Math.floor(Math.random() * 1025))
+    //         chart.update()
+    //     }, 1000);
+
+    // })()
+
     //挂载方法到window
     const methods = {
+        onPluginBtn,
+        handlePluginFileUpload,
         OP,
         onLANModalSubmit,
         switchSmsForwardMethodTab,

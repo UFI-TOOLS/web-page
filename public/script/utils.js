@@ -116,12 +116,22 @@ function kano_formatTime(seconds) {
     }
 }
 
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
-
+function formatBytes(bytes, needTrim = false) {
+    if (bytes === 0) return ' 0.00 B';
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
+    let size = (bytes / Math.pow(1024, i)).toFixed(2)
+    let str = String(size);
+    if (needTrim) {
+        if (size < 10) {
+            str = '&nbsp;&nbsp;&nbsp;' + String(size);
+        } else if (size < 100) {
+            str = '&nbsp;&nbsp;' + String(size);
+        } else if (size < 1000) {
+            str = '&nbsp;' + String(size);
+        }
+    }
+    return `${str} ${sizes[i]}`;
 }
 
 function decodeBase64(base64String) {
@@ -155,42 +165,46 @@ function encodeBase64(plainText) {
 }
 
 function createToast(text, color, delay = 3000) {
-    const toastContainer = document.querySelector("#toastContainer")
-    const toastEl = document.createElement('div')
-    toastEl.style.padding = '10px'
-    toastEl.style.fontSize = '14px'
-    toastEl.style.width = "fit-content"
-    toastEl.style.position = "relative"
-    toastEl.style.top = "0px"
-    toastEl.style.color = color || 'while'
-    toastEl.style.backgroundColor = 'var(--dark-card-bg)'
-    toastEl.style.transform = `scale(1)`
-    toastEl.style.transition = `all .3s ease`
-    toastEl.style.opacity = `0`
-    toastEl.style.transform = `scale(0)`
-    toastEl.style.transformOrigin = 'top center'
-    toastEl.style.boxShadow = '0 0 10px 0 #87ceeb70'
-    toastEl.style.fontWeight = 'bold'
-    toastEl.style.backdropFilter = 'blur(10px)'
-    toastEl.style.borderRadius = '6px'
-    toastEl.innerHTML = text;
-    const id = 'toastkano'
-    toastEl.setAttribute('class', id);
-    toastContainer.appendChild(toastEl)
-    setTimeout(() => {
-        toastEl.style.opacity = `1`
+    try {
+        const toastContainer = document.querySelector("#toastContainer")
+        const toastEl = document.createElement('div')
+        toastEl.style.padding = '10px'
+        toastEl.style.fontSize = '13px'
+        toastEl.style.width = "fit-content"
+        toastEl.style.position = "relative"
+        toastEl.style.top = "0px"
+        toastEl.style.color = color || 'while'
+        toastEl.style.backgroundColor = 'var(--dark-card-bg)'
         toastEl.style.transform = `scale(1)`
-    }, 50);
-    let timer = null
-    setTimeout(() => {
+        toastEl.style.transition = `all .3s ease`
         toastEl.style.opacity = `0`
         toastEl.style.transform = `scale(0)`
-        toastEl.style.top = '-' + toastEl.getBoundingClientRect().height + 'px'
-        clearTimeout(timer)
-        timer = setTimeout(() => {
-            toastContainer.removeChild(toastEl)
-        }, 300);
-    }, delay);
+        toastEl.style.transformOrigin = 'top center'
+        toastEl.style.boxShadow = '0 0 10px 0 #87ceeb70'
+        toastEl.style.fontWeight = 'bold'
+        toastEl.style.backdropFilter = 'blur(10px)'
+        toastEl.style.borderRadius = '6px'
+        toastEl.innerHTML = text;
+        const id = 'toastkano'
+        toastEl.setAttribute('class', id);
+        toastContainer.appendChild(toastEl)
+        setTimeout(() => {
+            toastEl.style.opacity = `1`
+            toastEl.style.transform = `scale(1)`
+        }, 50);
+        let timer = null
+        setTimeout(() => {
+            toastEl.style.opacity = `0`
+            toastEl.style.transform = `scale(0)`
+            toastEl.style.top = '-' + toastEl.getBoundingClientRect().height + 'px'
+            clearTimeout(timer)
+            timer = setTimeout(() => {
+                toastContainer.removeChild(toastEl)
+            }, 300);
+        }, delay);
+    } catch (e) {
+        console.error('创建toast失败:', e);
+    }
 }
 
 let modalTimer = null
@@ -300,74 +314,82 @@ function createSwitch({ text, value, className = '', onChange, fontSize = 14 }) 
 
 
 const createCollapseObserver = (boxEl = null) => {
-    if (!boxEl) return
-    const box = boxEl.querySelector('.collapse_box')
-    const resizeObserver = new ResizeObserver(() => {
-        const value = boxEl.getAttribute('data-name');
-        if (!box || value != 'open') return
-        boxEl.style.height = box.getBoundingClientRect().height + 'px'
-    });
-    resizeObserver.observe(box);
-    const observer = new MutationObserver((mutationsList) => {
-        for (const mutation of mutationsList) {
-            if (
-                mutation.type === 'attributes' &&
-                mutation.attributeName === 'data-name'
-            ) {
-                const newValue = boxEl.getAttribute('data-name');
-                if (!box) return
-                if (newValue == 'open') {
-                    boxEl.style.height = box.getBoundingClientRect().height + 'px'
-                    boxEl.style.overflow = 'hidden'
-                } else {
-                    boxEl.style.height = '0'
-                    boxEl.style.overflow = 'hidden'
+    try {
+        if (!boxEl) return
+        const box = boxEl.querySelector('.collapse_box')
+        const resizeObserver = new ResizeObserver(() => {
+            const value = boxEl.getAttribute('data-name');
+            if (!box || value != 'open') return
+            boxEl.style.height = box.getBoundingClientRect().height + 'px'
+        });
+        resizeObserver.observe(box);
+        const observer = new MutationObserver((mutationsList) => {
+            for (const mutation of mutationsList) {
+                if (
+                    mutation.type === 'attributes' &&
+                    mutation.attributeName === 'data-name'
+                ) {
+                    const newValue = boxEl.getAttribute('data-name');
+                    if (!box) return
+                    if (newValue == 'open') {
+                        boxEl.style.height = box.getBoundingClientRect().height + 'px'
+                        boxEl.style.overflow = 'hidden'
+                    } else {
+                        boxEl.style.height = '0'
+                        boxEl.style.overflow = 'hidden'
+                    }
                 }
             }
+        })
+        observer.observe(boxEl, {
+            attributes: true, // 监听属性变化
+            attributeFilter: ['data-name'], // 只监听 data-name 属性
+        });
+        return {
+            el: boxEl
         }
-    })
-    observer.observe(boxEl, {
-        attributes: true, // 监听属性变化
-        attributeFilter: ['data-name'], // 只监听 data-name 属性
-    });
-    return {
-        el: boxEl
+    } catch (e) {
+        console.error('createCollapseObserver error:', e);
     }
 }
 
 const collapseGen = (btn_id, collapse_id, storName, callback = undefined) => {
-    const { el: collapseMenuEl } = createCollapseObserver(document.querySelector(collapse_id));
-    if (storName) {
-        collapseMenuEl.dataset.name = localStorage.getItem(storName) || 'open';
-    } else {
-        collapseMenuEl.dataset.name = 'open'; // 默认打开
-    }
-    const collapseBtn = document.querySelector(btn_id);
-    const switchComponent = createSwitch({
-        value: collapseMenuEl.dataset.name == 'open',
-        className: storName || collapse_id,
-        onChange: (newVal) => {
-            if (collapseMenuEl && collapseMenuEl.dataset) {
-                collapseMenuEl.dataset.name = newVal ? 'open' : 'close';
-                callback?.(newVal ? 'open' : 'close');
-                if (storName) {
-                    localStorage.setItem(storName, collapseMenuEl.dataset.name);
+    try {
+        const { el: collapseMenuEl } = createCollapseObserver(document.querySelector(collapse_id));
+        if (storName) {
+            collapseMenuEl.dataset.name = localStorage.getItem(storName) || 'open';
+        } else {
+            collapseMenuEl.dataset.name = 'open'; // 默认打开
+        }
+        const collapseBtn = document.querySelector(btn_id);
+        const switchComponent = createSwitch({
+            value: collapseMenuEl.dataset.name == 'open',
+            className: storName || collapse_id,
+            onChange: (newVal) => {
+                if (collapseMenuEl && collapseMenuEl.dataset) {
+                    collapseMenuEl.dataset.name = newVal ? 'open' : 'close';
+                    callback && callback(newVal ? 'open' : 'close');
+                    if (storName) {
+                        localStorage.setItem(storName, collapseMenuEl.dataset.name);
+                    }
                 }
             }
-        }
-    });
+        });
 
-    // 用 container.update 来同步状态
-    const observer = new MutationObserver(() => {
-        const newVal = collapseMenuEl.dataset.name === 'open';
-        switchComponent.update?.(newVal);
-    });
-    observer.observe(collapseMenuEl, {
-        attributes: true,
-        attributeFilter: ['data-name'],
-    });
+        // 用 container.update 来同步状态
+        const observer = new MutationObserver(() => {
+            const newVal = collapseMenuEl.dataset.name === 'open';
+            switchComponent.update?.(newVal);
+        });
+        observer.observe(collapseMenuEl, {
+            attributes: true,
+            attributeFilter: ['data-name'],
+        });
 
-    collapseBtn.appendChild(switchComponent);
+        collapseBtn.appendChild(switchComponent);
+    } catch (e) {
+        console.error('collapseGen error:', e);
+    }
 };
 
 //inputIMEI

@@ -11,6 +11,7 @@
     <title id="TITLE">ZTE-UFI-TOOLS-WEB</title>
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="/style/style.css">
+    <script src="/script/polyfill.min.js"></script>
     <script src="/script/draglist.js"></script>
 </head>
 
@@ -19,7 +20,7 @@
         <div class="container">
             <div class="title" onclick="enableTTYD()"
                 style="align-self: start;justify-self: start;margin-bottom: 10px;;margin-top: 20px">
-                <strong id="MAIN_TITLE">ZTE-UFI管理工具</strong>
+                <strong id="MAIN_TITLE">UFI-TOOLS</strong>
                 <strong id="MODEL" style="font-size: 14px;"></strong>
             </div>
             <!-- 操作按钮 -->
@@ -37,25 +38,24 @@
                         onclick="createToast('请登录','red')">关机</button>
                     <button id="BG_SETTING" class="btn" onclick="createToast('请登录','red')">主题背景</button>
                     <div style="display: inline-block;position: relative;">
-                        <div class="tip">99+</div>
+                        <div class="tip" style="display: none;" id="UNREAD_SMS">0</div>
                         <button id="SMS" class="btn">短信收发</button>
                     </div>
                     <button id="DataManagement" class="btn">流量管理</button>
                     <button id="SpeedTestBtn" class="btn" onclick="showModal('#speedTestModal')">内网测速</button>
-                    <button id="ClientManagement" class="btn">连接设备管理</button>
+                    <button id="ClientManagement" class="btn">连接设备</button>
                     <button id="WIFIManagement" class="btn">WIFI设置</button>
                     <button id="LANManagement" class="btn">内网设置</button>
                     <button id="AT" class="btn" onclick="createToast('请登录','red')">AT指令</button>
                     <button id="ADVANCE" class="btn" onclick="createToast('请登录','red')">高级功能</button>
-                    <button id="CECULLAR" class="btn" onclick="createToast('请登录','red')">开启蜂窝数据</button>
-                    <button id="ADB" class="btn" onclick="createToast('请登录','red')">开启USB调试</button>
-                    <button id="ADB_NET" class="btn" onclick="createToast('请登录','red')">开启网络ADB自启</button>
-                    <button id="PERF" class="btn" onclick="createToast('请登录','red')">开启性能模式</button>
-                    <button id="LIGHT" class="btn" onclick="createToast('请登录','red')">开启指示灯</button>
-                    <button id="NFC" style="display: none;" class="btn"
-                        onclick="createToast('请登录','red')">开启NFC</button>
-                    <button id="SMB" class="btn" onclick="createToast('请登录','red')">开启SMB文件共享</button>
-                    <button id="ROAM" class="btn" onclick="createToast('请登录','red')">开启网络漫游</button>
+                    <button id="CECULLAR" class="btn" onclick="createToast('请登录','red')">数据流量</button>
+                    <button id="ADB" class="btn" onclick="createToast('请登录','red')">USB调试</button>
+                    <button id="ADB_NET" class="btn" onclick="createToast('请登录','red')">网络ADB自启</button>
+                    <button id="PERF" class="btn" onclick="createToast('请登录','red')">性能模式</button>
+                    <button id="LIGHT" class="btn" onclick="createToast('请登录','red')">指示灯</button>
+                    <button id="NFC" style="display: none;" class="btn" onclick="createToast('请登录','red')">NFC</button>
+                    <button id="SMB" class="btn" onclick="createToast('请登录','red')">文件共享</button>
+                    <button id="ROAM" class="btn" onclick="createToast('请登录','red')">网络漫游</button>
                     <button id="smsForward" class="btn" onclick="createToast('请登录','red')">短信转发</button>
                     <button id="OTA" class="btn" onclick="createToast('请登录','red')">软件更新</button>
                     <select class="select" id="NET_TYPE" onchange="changeNetwork(event)">
@@ -82,23 +82,30 @@
                 <div class="title" style="margin: 6px 0;">
                     <strong>基本状态</strong>
                     <div style="display: inline-block;" id="collapse_status_btn"></div>
-                    <button id="DICTIONARY" class="btn" style="padding: 4px;margin-left: 10px;">管理字段</button>
-                    <button id="REFRESH" class="btn" style="padding: 4px;margin-left: 10px;">停止刷新</button>
                 </div>
                 <div class="collapse" id="collapse_status">
                     <div class="collapse_box">
-                        <ul class="deviceList" id="STATUS">
-                            <li style="padding-top: 15px;">
-                                <strong class="green"
-                                    style="margin: 10px auto;margin-top: 0; display: flex;flex-direction: column;padding: 40px;">
-                                    <span style="font-size: 50px;" class="spin">🌀</span>
-                                    <span style="font-size: 16px;padding-top: 10px;">loading...</span>
-                                </strong>
-                            </li>
-                        </ul>
+                        <div style="overflow: auto;">
+                            <div class="title" style="margin-bottom: 6px;">
+                                <button id="DICTIONARY" class="btn" style="padding: 4px;margin-left: 0;">管理字段</button>
+                                <button id="REFRESH" class="btn" style="padding: 4px;margin-left: 10px;">停止刷新</button>
+                            </div>
+                            <ul class="deviceList" id="STATUS">
+                                <li style="padding-top: 15px;">
+                                    <strong class="green"
+                                        style="margin: 10px auto;margin-top: 0; display: flex;flex-direction: column;padding: 40px;">
+                                        <span style="font-size: 50px;" class="spin">🌀</span>
+                                        <span style="font-size: 16px;padding-top: 10px;">loading...</span>
+                                    </strong>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
+            <!-- <div class="chart" style="width: 100%;">
+                <canvas id="kanoChart"></canvas>
+            </div> -->
             <!-- TTYD -->
             <div id="TTYD" style="display: none;width: 100%;margin-top: 10px;">
                 <div class="title" style="margin: 6px 0 ;">
@@ -375,8 +382,8 @@
                     <!-- 在这里管理字段显示 -->
                     <div class="title" style="margin: 10px 0;">基本状态</div>
                     <ul class="drag" id="draggable_status">
-                        <li draggable="true"> <label><input type="checkbox" data-name="network_type">蜂窝状态</label></li>
                         <li draggable="true"> <label><input type="checkbox" data-name="QORS_MESSAGE">QCI等级</label></li>
+                        <li draggable="true"> <label><input type="checkbox" data-name="network_type">蜂窝状态</label></li>
                         <li draggable="true"> <label><input type="checkbox"
                                     data-name="wifi_access_sta_num">WIFI设备数</label>
                         </li>
@@ -389,10 +396,6 @@
                         <li draggable="true"> <label><input type="checkbox" data-name="monthly_tx_bytes">流量使用情况</label>
                         </li>
                         <li draggable="true"> <label><input type="checkbox" data-name="daily_data">当日流量</label></li>
-                        <li draggable="true"> <label><input type="checkbox"
-                                    data-name="internal_available_storage">内置存储</label></li>
-                        <li draggable="true"> <label><input type="checkbox"
-                                    data-name="external_available_storage">SD卡</label></li>
                         <li draggable="true"> <label><input type="checkbox" data-name="realtime_rx_thrpt">实时网速</label>
                         </li>
                     </ul>
@@ -433,6 +436,10 @@
                         <li draggable="true"> <label><input type="checkbox" data-name="lan_ipaddr">本地网关</label></li>
                         <li draggable="true"> <label><input type="checkbox" data-name="mac_address">MAC地址</label></li>
                         <li draggable="true"> <label><input type="checkbox" data-name="msisdn">手机号</label></li>
+                        <li draggable="true"> <label><input type="checkbox"
+                                    data-name="internal_available_storage">内置存储</label></li>
+                        <li draggable="true"> <label><input type="checkbox"
+                                    data-name="external_available_storage">SD卡</label></li>
                     </ul>
                 </div>
                 <div class="btn" style="text-align: right;">
@@ -480,8 +487,8 @@
                                 display: flex;
                                 align-items: center;
                             ">提醒阈值：<input style="flex: 1;width: 100%;" name="data_volume_alert_percent" value="80"
-                                        type="number" maxlength="3" min="0" max="100"
-                                        placeholder="提醒阈值(0-100%)"></label>
+                                        type="number" maxlength="3" min="0" max="100" placeholder="提醒阈值(0-100%)">&nbsp;%
+                                    (0-100%)</label>
                             </div>
                             <div class="item">
                                 <div style="display: flex;align-items: center">
@@ -715,37 +722,52 @@
             </div>
             <!-- 设置背景模态框 -->
             <div class="modal" id="bgSettingModal"
-                style="width: 90%;max-width: 400px; display: flex;flex-direction: column;display: none;">
+                style="overflow: hidden;;width: 90%;max-width: 400px; display: flex;flex-direction: column;display: none;">
                 <div class="title" style="margin-bottom: 4px;">主题背景设置</div>
-                <div style="text-align: left ;">
-                    <p style="font-size: 14px"><label
-                            style="display: flex;align-items: center;"><span>启用背景图片？</span><input type="checkbox"
-                                id="isCheckedBG"></label></p>
-                    <p style="font-size: 14px;">图片网址：
-                        <input placeholder="输入网址" type="text" id="BG_INPUT"
-                            style="width: 100%;max-width: 200px;padding: 6px 10px;margin: 4px 0;">
-                    </p>
-                    <label><input id="fileUploader" type="file" style="display: none;"
-                            onchange="handleFileUpload(event)">
-                        <button style="width: 100%;"
-                            onclick="document.querySelector('#fileUploader').click()">上传图片(3MB内)</button></label>
-                </div>
-                <div style="text-align: left;width: 100%;font-size: 14px;">
-                    <p>字体颜色(黑-白)</p>
-                    <input id="textColorEl" oninput="updateTextColor(event)"
-                        style="width: 100%;margin-left: 0;margin-right: 0;" min="0" max="100" type="range">
-                    <p>主题颜色(颜色、饱和度、亮度)</p>
-                    <div class="color-panel">
+                <div class="content" style="min-height: 400px;">
+                    <div style="text-align: left ;">
+                        <p style="font-size: 14px"><label
+                                style="display: flex;align-items: center;"><span>启用背景图片？</span><input type="checkbox"
+                                    id="isCheckedBG"></label></p>
+                        <p style="font-size: 14px;">图片网址：
+                            <input placeholder="输入网址" type="text" id="BG_INPUT"
+                                style="width: 100%;max-width: 200px;padding: 6px 10px;margin: 4px 0;">
+                        </p>
+                        <label><input id="fileUploader" type="file" style="display: none;"
+                                onchange="handleFileUpload(event)">
+                            <button style="width: 100%;"
+                                onclick="document.querySelector('#fileUploader').click()">上传图片(3MB内)</button></label>
                     </div>
-                    <input id="colorEl" oninput="getColorByPercent(event)"
-                        style="width: 100%;margin-left: 0;margin-right: 0;" min="0" max="100" type="range">
-                    <input id="saturationEl" oninput="getSaturationByPercent(event)"
-                        style="width: 100%;margin-left: 0;margin-right: 0;" min="0" max="100" type="range">
-                    <input id="brightEl" oninput="getValueByPercent(event)"
-                        style="width: 100%;margin-left: 0;margin-right: 0;" min="0" max="100" type="range">
-                    <p>背景透明度</p>
-                    <input id="opacityEl" oninput="getOpacityByPercent(event)"
-                        style="width: 100%;margin-left: 0;margin-right: 0;" type="range" min="0" max="100">
+                    <div style="text-align: left;width: 100%;font-size: 14px;">
+                        <p>字体颜色(黑-白)</p>
+                        <input id="textColorEl" oninput="updateTextColor(event)"
+                            style="width: 100%;margin-left: 0;margin-right: 0;" min="0" max="100" type="range">
+                        <p>主题颜色(颜色、饱和度、亮度)</p>
+                        <div class="color-panel">
+                        </div>
+                        <input id="colorEl" oninput="getColorByPercent(event)"
+                            style="width: 100%;margin-left: 0;margin-right: 0;" min="0" max="100" type="range">
+                        <input id="saturationEl" oninput="getSaturationByPercent(event)"
+                            style="width: 100%;margin-left: 0;margin-right: 0;" min="0" max="100" type="range">
+                        <input id="brightEl" oninput="getValueByPercent(event)"
+                            style="width: 100%;margin-left: 0;margin-right: 0;" min="0" max="100" type="range">
+                        <p>背景透明度</p>
+                        <input id="opacityEl" oninput="getOpacityByPercent(event)"
+                            style="width: 100%;margin-left: 0;margin-right: 0;" type="range" min="0" max="100">
+                        <p>自定义头部</p>
+                        <div class="title" style="font-style: italic;font-size: 12px;">
+                            <i>填入的内容会放在网页head末尾(支持脚本样式和meta元素),大小不能超过1145KB</i>
+                        </div>
+                        <div>
+                            <button class="btn" style="width: 100%;margin-top: 6px;"
+                                onclick="onPluginBtn()">添加插件(.txt文件)</button>
+                            <input type="file" id="pluginFileInput" style="display: none;"
+                                onchange="handlePluginFileUpload(event)">
+                        </div>
+                        <textarea id="custom_head"
+                            style="font-size: 12px;font-family: monospace;margin: 6px 0;resize: vertical;width: 100%;box-sizing: border-box;"
+                            rows="20"></textarea>
+                    </div>
                 </div>
                 <div class="btn" style="text-align: right;margin-top: 6px;">
                     <button type="button" onclick="resetTheme(event)">重置主题</button>
@@ -795,11 +817,15 @@
                 <div class="modal" style="width: 90%;max-width: 800px; display: flex;flex-direction: column;">
                     <div class="title" style="margin-bottom: 4px;">AT指令</div>
                     <div class="title" style="margin-bottom: 4px;font-size: 12px;">
-                        <i style="color: yellow;">⚠️警告：执行自定义AT属于高级操作，请务必确保输入准确无误。因执行指令所引发的任何后果，需由您自行承担。</i>
+                        <div style="font-size: 10px;">
+                            <i style="color: yellow;">⚠️警告：执行自定义AT属于高级操作，请务必确保输入准确无误。因执行指令所引发的任何后果，需由您自行承担。</i><br>
+                            <i style="color: yellow;">⚠️提示：AT指令(同网络ADB)生效版本：F50:B09\B24 U30:B17\B19
+                                M3:B07 无法使用请带上你的固件版本提问，拒绝无效提问（恢复出厂设置能解决99%问题）</i>
+                        </div>
                     </div>
-                    <p style="font-size: 14px;margin-bottom: 0;margin-top:10px;">自定义AT指令</p>
-                    <div style="margin: 10px 0;">
-                        <span style="font-size: 14px;">AT执行槽位：</span>
+                    <p style="font-size: 12px;margin-bottom: 0;margin-top:10px;">自定义AT指令</p>
+                    <div style="margin: 6px 0;">
+                        <span style="font-size: 12px;">AT执行槽位：</span>
                         <select class="select" id="AT_SLOT" style="width: 100%;max-width: 100px;padding: 6px 10px;"
                             value="0">
                             <option data-value="0" value="0">0</option>
@@ -817,7 +843,7 @@
                         <div style="margin-top: 2px;margin-bottom: 10px;">
                             <div style="display: flex;flex-wrap: wrap; gap: 10px;">
                                 <div>
-                                    <p style="font-size: 14px;margin-bottom: 10px;margin-top: 8px;">快捷指令</p>
+                                    <p style="font-size: 12px;margin-bottom: 4px;margin-top: 4px;">快捷指令</p>
                                     <button class="btn"
                                         onclick="disableButtonWhenExecuteFunc(event,handleQosAT)">签约速率</button>
                                     <button class="btn"
@@ -858,7 +884,7 @@
                                         <div>
                                             <i>TTYD端口为1146(三击标题区域可更改)</i><br>
                                             <i class="user_select">如去除高级功能报错，可以在TTYD上执行 sh
-                                                /sdcard/unlock_samba.sh 重启生效</i><br>
+                                                /sdcard/unlock_samba.sh 重启生效</i>
                                             <i><br>添加高级功能包括:<br>
                                                 1.优化Samba目录(添加sd卡目录，设备根目录)<br>
                                                 2.添加TTYD，自带RootShell<br>
@@ -963,16 +989,16 @@
                     <div style="font-size: 12px;margin-top: 10px;" class="adb_status title"></div>
                     <div class="title" style="font-size: 10px;margin-top: 10px;">
                         <div>
-                            <i>软件更新功能需要启用网络ADB调试功能，没有启用无法使用 ”一键更新“ 功能，可以点击 "下载安装包" 自行下载安装，如果更新失败，可以关闭窗口再试</i><br>
-                            <i>使用有线网络的用户，请暂时关掉"网络ADB自启"开关，否则更新完成之后会断网</i>
+                            <i>软件更新需要启用USB调试+网络ADB调试功能(重启，或者关闭开启一下USB调试),如无法正常使用一键更新功能,可以点击下载安装包自行下载安装。</i><br>
+                            <i>使用有线网络的用户请暂时关掉"网络ADB自启"开关,否则更新完成之后会断网</i><br>
+                            <i>由于Android的包管理机制,更新完成后不要直接拔电(会造成数据丢失);请手动重启一次,缓存才会全部写入。</i>
                         </div>
                     </div>
+                    <div class="speedtest" style="border-left: 6px solid pink;font-size: 12px;margin-top: 10px;"
+                        id="OTATextContent">正在检查更新...</div>
                     <div class="content" style="
-                        overflow-y: scroll;
-                        margin: 15px 0;
-                        max-width: 400px;">
-                        <div class="speedtest" style="font-size: 12px;" id="OTATextContent">正在检查更新...</div>
-                        <div class="speedtest" style="font-size: 12px;margin-top: 10px;" id="ChangelogTextContent">
+                        margin: 15px 0;overflow-y: scroll;max-height: 250px;">
+                        <div class="speedtest" style="font-size: 12px;" id="ChangelogTextContent">
                         </div>
                     </div>
                     <div class="btn" style="text-align: right;">
@@ -1054,12 +1080,14 @@
                             <form onsubmit="handleSmsForwardCurlForm(event)" id="smsForwardCurlForm"
                                 style="display: none;">
                                 <div class="content" style="
-                        overflow-y: scroll;
-                        padding: 15px;
-                        width: 66vw;
-                        max-width: 400px;">
-                                    <div class="title" style="font-size: 12px;">
-                                        短信内容占位符：{{sms-body}} {{sms-time}} {{sms-from}}
+                                    overflow-y: scroll;
+                                    padding: 15px;
+                                    width: 66vw;
+                                    max-width: 400px;">
+                                    <div class="title user_select" style="display:block;font-size: 12px;">
+                                        注意：命令需是“一口气”输入的，不要中途按回车换行或用 \ 接续，注意参数间的空格<br>
+                                        短信内容占位符：<span onclick="copyText(event)">{{sms-body}} {{sms-time}}
+                                            {{sms-from}}</span>
                                     </div>
                                     <div class="item" style="margin: 10px auto;">
                                         <div style="
@@ -1112,14 +1140,15 @@
         </div>
     </div>
     <div class="footer">
-        <p>Made by <a href="https://github.com/kanoqwq/UFI-TOOLS" target="_blank">MiniKano</a> with love ❤️ &nbsp;<a
+        <p>Made by <a href="https://github.com/kanoqwq/UFI-TOOLS" target="_blank">MiniKano</a> with love ❤️&nbsp;<a
                 href="javascript:;" onclick="showModal('#payModal')">打赏作者</a></p>
     </div>
     <div id="toastContainer"></div>
+    <script src="/script/crypto.js"></script>
     <script src="/script/utils.js"></script>
     <script src="/script/theme.js"></script>
     <script src="/script/requests.js"></script>
-    <script src="/script/preload.js"></script>
+    <script src="/script/chart.js"></script>
     <script src="/script/main.js"></script>
 </body>
 

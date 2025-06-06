@@ -199,7 +199,6 @@ textarea::placeholder {
     border-radius: 10px;
     opacity: 1;
     transition: all .3s;
-    /* background-color: #00ffdd17; */
     box-shadow: 0 0 10px 0 #00000076;
 }
 
@@ -207,8 +206,7 @@ button {
     padding: 5px 10px;
     background-color: var(--dark-btn-color);
     border: 1px solid transparent;
-    border-radius: 5px;
-    /* color: white; */
+    border-radius: 8px;
     color: var(--dark-text-color);
     transition: box-shadow .2s;
     font-size: 12px;
@@ -599,13 +597,14 @@ li.dragging {
 }
 
 .Switch .switch {
+    overflow: hidden;
     display: inline-block;
     position: relative;
     user-select: none;
     height: 24px;
     width: 60px;
     padding: 0;
-    border-radius: 4px;
+    border-radius: 24px;
     background-color: var(--dark-card-bg);
     transition: all 0.3s ease;
 }
@@ -616,7 +615,7 @@ li.dragging {
     height: 100%;
     width: 50%;
     background-color: var(--dark-btn-disabled-color);
-    border-radius: 4px;
+    border-radius: 24px;
     transition: all 0.3s ease;
 }
 
@@ -904,7 +903,7 @@ li.dragging {
     pointer-events: none;
 }
 
-.tip{
+.tip {
     position: absolute;
     display: flex;
     align-items: center;
@@ -919,4 +918,8 @@ li.dragging {
     border-radius: 50%;
     background-color: #ff0000c0;
     transform: scale(0.8);
+}
+
+#bgSettingModal p{
+    margin: 10px 0;
 }
